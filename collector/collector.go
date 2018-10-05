@@ -12,6 +12,7 @@ package collector
 //--------------------
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -113,10 +114,11 @@ func (c *Collector) Register(mps ...MeterPoint) error {
 }
 
 // Retrieve tells the collector to retrieve the metrics. Each has
-// at max. the passed duration time, otherwise the value will be
+// at maximum the passed duration time, otherwise the value will be
 // "error: timeout". All retrievals will be parallel, the wait group
-// waits for all retrievals.
-func (c *Collector) Retrieve(timeout time.Duration) *Metrics {
+// waits for all retrievals. The context can cancel the collector
+// retrieval as well as all individual goroutines.
+func (c *Collector) Retrieve(ctx context.Context, timeout time.Duration) *Metrics {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	metrics := NewMetrics(len(c.meterPoints))
@@ -126,6 +128,8 @@ func (c *Collector) Retrieve(timeout time.Duration) *Metrics {
 		go func(fid string, fmp MeterPoint) {
 			defer wg.Done()
 			select {
+			case <-ctx.Done():
+				metrics.Set(fid, "error: cancelled")
 			case value := <-fmp.Retrieve():
 				metrics.Set(fid, value)
 			case <-time.After(timeout):
