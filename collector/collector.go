@@ -40,16 +40,38 @@ type MeterPoint interface {
 //--------------------
 
 // Metrics contains the collected values for marshalling.
-type Metrics map[string]string
+type Metrics struct {
+	mu     sync.RWMutex
+	values map[string]string
+}
 
 // NewMetrics creates empty metrics prepared to take the passed number of values.
-func NewMetrics(size int) Metrics {
-	return make(Metrics, size)
+func NewMetrics(size int) *Metrics {
+	return &Metrics{
+		values: make(map[string]string, size),
+	}
+}
+
+// Set sets one value of the metrics.
+func (m *Metrics) Set(id, value string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.values[id] = value
+}
+
+// Get reads one value from the metrics.
+func (m *Metrics) Get(id string) (string, bool) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	value, ok := m.values[id]
+	return value, ok
 }
 
 // Marshal returns the metrics encoded in JSON.
-func (m Metrics) Marshal() ([]byte, error) {
-	return json.Marshal(m)
+func (m *Metrics) Marshal() ([]byte, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return json.Marshal(m.values)
 }
 
 //--------------------
@@ -85,7 +107,7 @@ func (c *Collector) Register(mps ...MeterPoint) error {
 		c.meterPoints[id] = mp
 	}
 	if len(dupes) > 0 {
-		return fmt.Errorf("double IDs: %s", strings.Join(dupes, ", "))
+		return fmt.Errorf("error: double IDs (%s)", strings.Join(dupes, ", "))
 	}
 	return nil
 }
@@ -94,7 +116,7 @@ func (c *Collector) Register(mps ...MeterPoint) error {
 // at max. the passed duration time, otherwise the value will be
 // "error: timeout". All retrievals will be parallel, the wait group
 // waits for all retrievals.
-func (c *Collector) Retrieve(timeout time.Duration) Metrics {
+func (c *Collector) Retrieve(timeout time.Duration) *Metrics {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	metrics := NewMetrics(len(c.meterPoints))
@@ -105,9 +127,9 @@ func (c *Collector) Retrieve(timeout time.Duration) Metrics {
 			defer wg.Done()
 			select {
 			case value := <-fmp.Retrieve():
-				metrics[fid] = value
+				metrics.Set(fid, value)
 			case <-time.After(timeout):
-				metrics[fid] = "error: timeout"
+				metrics.Set(fid, "error: timeout")
 			}
 		}(id, mp)
 	}

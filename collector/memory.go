@@ -12,7 +12,8 @@ package collector
 //--------------------
 
 import (
-	"os/exec"
+	"bufio"
+	"os"
 	"strings"
 )
 
@@ -37,7 +38,8 @@ const (
 // MEMORY METER POINT
 //--------------------
 
-// MemoryMeterPoint retrieves different memory related metrics.
+// MemoryMeterPoint retrieves different memory related metrics by reading
+// the /proc/meminfo file.
 type MemoryMeterPoint struct {
 	detail MemoryDetail
 	id     string
@@ -84,13 +86,17 @@ func (mmp *MemoryMeterPoint) ID() string {
 func (mmp *MemoryMeterPoint) Retrieve() <-chan string {
 	memC := make(chan string, 1)
 	go func() {
-		out, err := exec.Command("cat", "/proc/meminfo").Output()
+		file, err := os.Open("/proc/meminfo")
 		if err != nil {
 			memC <- "error: " + err.Error()
-			return
 		}
-		lines := strings.Split(string(out), "\n")
-		for _, line := range lines {
+		defer file.Close()
+		reader := bufio.NewReader(file)
+		for {
+			line, err := reader.ReadString('\n')
+			if err != nil {
+				break
+			}
 			if !strings.HasPrefix(line, mmp.prefix) {
 				continue
 			}

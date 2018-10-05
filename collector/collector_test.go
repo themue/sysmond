@@ -34,16 +34,31 @@ func TestCollectorOK(t *testing.T) {
 		t.Errorf("collector register error: %v", err)
 	}
 	metrics := c.Retrieve(time.Second)
-	if metrics["a"] != "1" {
-		t.Errorf("illegal value a: %v", metrics["a"])
+	if a, ok := metrics.Get("a"); !ok || a != "1" {
+		t.Errorf("illegal value a: %q", a)
 	}
 	metrics = c.Retrieve(time.Second)
-	if metrics["b"] != "7" {
-		t.Errorf("illegal value b: %v", metrics["b"])
+	if b, ok := metrics.Get("b"); !ok || b != "7" {
+		t.Errorf("illegal value b: %q", b)
 	}
 	metrics = c.Retrieve(time.Second)
-	if metrics["c"] != "13" {
-		t.Errorf("illegal value c: %v", metrics["c"])
+	if c, ok := metrics.Get("c"); !ok || c != "13" {
+		t.Errorf("illegal value c: %q", c)
+	}
+}
+
+// TestCollectorError tests registering meter points with duplicate ID.
+func TestCollectorError(t *testing.T) {
+	c := collector.New()
+	mpa := NewStubMeterPoint("a", 0)
+	mpb := NewStubMeterPoint("b", 5)
+	mpc := NewStubMeterPoint("b", 10) // <- Double ID.
+	err := c.Register(mpa, mpb, mpc)
+	if err == nil {
+		t.Errorf("expected registration error")
+	}
+	if err.Error() != "error: double IDs (b)" {
+		t.Errorf("expected different registration error: %v", err)
 	}
 }
 
