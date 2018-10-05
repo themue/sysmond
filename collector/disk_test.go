@@ -23,7 +23,8 @@ import (
 // TESTS
 //--------------------
 
-// TestDiskOK tests disk data retrieving with valid parameters.
+// TestDiskOK tests disk data retrieving with valid parameters. Demonstrates table
+// driven tests.
 func TestDiskOK(t *testing.T) {
 	tests := []struct {
 		fullID string
@@ -97,7 +98,6 @@ func TestDiskError(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		t.Errorf("meter point timeout")
 	}
-
 }
 
 // EOF
