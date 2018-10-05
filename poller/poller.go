@@ -67,7 +67,6 @@ func (p *Poller) Metrics() (t time.Time, m *collector.Metrics) {
 func (p *Poller) backend() {
 	ticker := time.NewTicker(p.interval)
 	defer ticker.Stop()
-
 	for {
 		select {
 		case <-p.ctx.Done():

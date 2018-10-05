@@ -13,25 +13,23 @@ package collector
 
 import (
 	"fmt"
-	"os/exec"
 )
 
 //--------------------
 // GENERIC METER POINT
 //--------------------
 
-// GenericMeterPoint retrieves the single first line returned by the
-// configured command, which typically is a shell script.
+// GenericMeterPoint takes a user defined function to retrieve any wanted value.
 type GenericMeterPoint struct {
-	id      string
-	command string
+	id       string
+	retrieve func() (string, error)
 }
 
-// NewGenericMeterPoint creates a new meter point for disk space.
-func NewGenericMeterPoint(id, command string) *GenericMeterPoint {
+// NewGenericMeterPoint creates a new meter point for generic functions.
+func NewGenericMeterPoint(id string, r func() (string, error)) *GenericMeterPoint {
 	return &GenericMeterPoint{
-		id:      id,
-		command: command,
+		id:       id,
+		retrieve: r,
 	}
 }
 
@@ -44,12 +42,12 @@ func (gmp *GenericMeterPoint) ID() string {
 func (gmp *GenericMeterPoint) Retrieve() <-chan string {
 	valueC := make(chan string, 1)
 	go func() {
-		out, err := exec.Command(gmp.command).Output()
+		value, err := gmp.retrieve()
 		if err != nil {
-			valueC <- fmt.Sprintf("error: cannot execute command: %v", err)
+			valueC <- fmt.Sprintf("error: %v", err)
 			return
 		}
-		valueC <- string(out)
+		valueC <- value
 	}()
 	return valueC
 }
