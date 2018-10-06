@@ -56,11 +56,14 @@ func (p *Poller) SetCollector(c *collector.Collector) {
 }
 
 // Metrics retrieves the latest metrics and the according timestamp.
-func (p *Poller) Metrics() (t time.Time, m *collector.Metrics) {
+func (p *Poller) Metrics() (time.Time, *collector.Metrics) {
+	var ts time.Time
+	var m *collector.Metrics
 	p.actorC <- func() {
-		t = p.timestamp
+		ts = p.timestamp
 		m = p.metrics
 	}
+	return ts, m
 }
 
 // backend runs the poller goroutine and calls the collector in intervals.
@@ -71,8 +74,8 @@ func (p *Poller) backend() {
 		select {
 		case <-p.ctx.Done():
 			return
-		case f := p.actorC:
-			f()
+		case act := <-p.actorC:
+			act()
 		case <-ticker.C:
 			p.timestamp = time.Now()
 			p.metrics = p.collector.Retrieve(p.ctx, p.interval)
