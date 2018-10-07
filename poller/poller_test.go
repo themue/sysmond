@@ -26,8 +26,8 @@ import (
 // TESTS
 //--------------------
 
-// TestPollerOK tests a correct working poller.
-func TestPollerOK(t *testing.T) {
+// TestPoller tests the working of a poller.
+func TestPoller(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(3)
 	mpsync := collector.NewGenericMeterPoint("sync", func() (string, error) {
@@ -35,7 +35,8 @@ func TestPollerOK(t *testing.T) {
 		return "done", nil
 	})
 	c := collector.New()
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	mpa := NewMeterPoint("a")
 	mpb := NewMeterPoint("b")
 	mpc := NewMeterPoint("c")
