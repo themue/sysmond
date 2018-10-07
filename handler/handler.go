@@ -26,22 +26,22 @@ import (
 //--------------------
 
 // metricsHandler provides a http.Handler running the metrics server.
-type metricsHandler struct {
+type handler struct {
 	collector *collector.Collector
 	poller    *poller.Poller
 }
 
 // newMetricsHandler returns a new metrics handler instance.
-func newMetricsHandler(ctx context.Context, c *collector.Collector, i time.Duration) http.Handler {
-	return &metricsHandler{
+func New(ctx context.Context, c *collector.Collector, i time.Duration) http.Handler {
+	return &handler{
 		collector: c,
 		poller:    poller.New(ctx, c, i),
 	}
 }
 
 // ServeHTTP implements the http.Handler interface.
-func (mh *metricsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	ts, m := mh.poller.Metrics()
+func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	ts, m := h.poller.Metrics()
 	tsb, _ := ts.MarshalText()
 	tss := string(tsb)
 	b, err := m.Marshal()
