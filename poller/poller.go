@@ -55,15 +55,18 @@ func (p *Poller) SetCollector(c *collector.Collector) {
 	}
 }
 
-// Metrics retrieves the latest metrics and the according timestamp.
-func (p *Poller) Metrics() (time.Time, *collector.Metrics) {
-	var ts time.Time
-	var m *collector.Metrics
+// Metrics retrieves the latest metrics and the according timestamp. Wait channel
+// is needed to avoid race conditions, could be done in a small actor package like
+// in https://github.com/tideland/gotogether.
+func (p *Poller) Metrics() (ts time.Time, m *collector.Metrics) {
+	waitC := make(chan struct{})
 	p.actorC <- func() {
 		ts = p.timestamp
 		m = p.metrics
+		close(waitC)
 	}
-	return ts, m
+	<-waitC
+	return
 }
 
 // backend runs the poller goroutine and calls the collector in intervals.
