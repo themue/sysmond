@@ -1,4 +1,4 @@
-// System Monitor Daemon - Collector - Disk Meter Point
+// System Monitor Daemon - Collector - Disk Meter Points
 //
 // Copyright (C) 2018 Frank Mueller / Oldenburg / Germany
 //
@@ -17,78 +17,47 @@ import (
 )
 
 //--------------------
-// CONSTANTS
-//--------------------
-
-// MemoryDetail defines the detail which is retrieved by the disk meter point.
-type DiskDetail int
-
-const (
-	DiskTotal DiskDetail = iota + 1
-	DiskUsed
-	DiskAvailable
-)
-
-//--------------------
-// DISK METER POINT
+// DISK METER POINTS
 //--------------------
 
 // DiskMeterPoint retrieves total, used, and available kilobytes of
 // individual file systems.
-type DiskMeterPoint struct {
-	id     string
-	mount  string
-	detail DiskDetail
+type DiskMeterPoints struct {
+	id    string
+	mount string
 }
 
-// NewDiskMeterPoint creates a new meter point for disk space.
-func NewDiskMeterPoint(id, mount string, detail DiskDetail) *DiskMeterPoint {
-	dmp := &DiskMeterPoint{
-		id:     id,
-		mount:  mount,
-		detail: detail,
+// NewDiskMeterPoints creates new meter points for disk space.
+func NewDiskMeterPoints(id, mount string) *DiskMeterPoints {
+	return &DiskMeterPoints{
+		id:    "sys.disk." + id,
+		mount: mount,
 	}
-	switch detail {
-	case DiskTotal:
-		dmp.id = "sys.disk.total." + id
-	case DiskUsed:
-		dmp.id = "sys.disk.used." + id
-	case DiskAvailable:
-		dmp.id = "sys.disk.available." + id
-	default:
-		dmp.id = "sys.disk.invalid." + id
-	}
-	return dmp
 }
 
-// ID implements MeterPoint.
-func (dmp *DiskMeterPoint) ID() string {
+// ID implements MeterPoints.
+func (dmp *DiskMeterPoints) ID() string {
 	return dmp.id
 }
 
-// Retrieve implements MeterPoint.
-func (dmp *DiskMeterPoint) Retrieve() <-chan string {
-	diskC := make(chan string, 1)
+// Retrieve implements MeterPoints.
+func (dmp *DiskMeterPoints) Retrieve() <-chan Values {
+	valuesC := make(chan Values, 1)
 	go func() {
 		out, err := exec.Command("df", "-Pk", dmp.mount).Output()
 		if err != nil {
-			diskC <- "error: cannot retrieve disk space"
+			valuesC <- Values{"all": "error: cannot retrieve disk space"}
 			return
 		}
 		lines := strings.Split(string(out), "\n")
 		fields := strings.Fields(lines[1])
-		switch dmp.detail {
-		case DiskTotal:
-			diskC <- fields[1]
-		case DiskUsed:
-			diskC <- fields[2]
-		case DiskAvailable:
-			diskC <- fields[3]
-		default:
-			diskC <- "error: invalid detail"
-		}
+		values := make(Values, 3)
+		values["total"] = fields[1]
+		values["used"] = fields[2]
+		values["available"] = fields[3]
+		valuesC <- values
 	}()
-	return diskC
+	return valuesC
 }
 
 // EOF

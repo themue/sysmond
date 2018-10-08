@@ -1,4 +1,4 @@
-// System Monitor Daemon - Collector - Command Meter Point
+// System Monitor Daemon - Collector - Command Meter Points
 //
 // Copyright (C) 2018 Frank Mueller / Oldenburg / Germany
 //
@@ -14,44 +14,52 @@ package collector
 import (
 	"fmt"
 	"os/exec"
+	"strings"
 )
 
 //--------------------
-// COMMAND METER POINT
+// COMMAND METER POINTS
 //--------------------
 
-// CommandMeterPoint retrieves the single first line returned by the
-// configured command, which typically is a shell script.
-type CommandMeterPoint struct {
+// CommandMeterPoint retrieves the single all lines returned by the
+// configured command, which typically is a shell script. The lines
+// are enumerated.
+type CommandMeterPoints struct {
 	id      string
 	command string
 }
 
-// NewCommandMeterPoint creates a new meter point for a passed command.
-func NewCommandMeterPoint(id, command string) *CommandMeterPoint {
-	return &CommandMeterPoint{
+// NewCommandMeterPoints creates a new meter point for a passed command.
+func NewCommandMeterPoints(id, command string) *CommandMeterPoints {
+	return &CommandMeterPoints{
 		id:      id,
 		command: command,
 	}
 }
 
-// ID implements MeterPoint.
-func (cmp *CommandMeterPoint) ID() string {
+// ID implements MeterPoints.
+func (cmp *CommandMeterPoints) ID() string {
 	return cmp.id
 }
 
-// Retrieve implements MeterPoint.
-func (cmp *CommandMeterPoint) Retrieve() <-chan string {
-	valueC := make(chan string, 1)
+// Retrieve implements MeterPoints.
+func (cmp *CommandMeterPoints) Retrieve() <-chan Values {
+	valuesC := make(chan Values, 1)
 	go func() {
 		out, err := exec.Command(cmp.command).Output()
 		if err != nil {
-			valueC <- fmt.Sprintf("error: cannot execute command: %v", err)
+			errMsg := fmt.Sprintf("error: cannot execute command: %v", err)
+			valuesC <- Values{"1": errMsg}
 			return
 		}
-		valueC <- string(out)
+		lines := strings.Split(string(out), "\n")
+		values := make(Values, len(lines))
+		for i, line := range lines {
+			values[fmt.Sprintf("%d", i+1)] = line
+		}
+		valuesC <- values
 	}()
-	return valueC
+	return valuesC
 }
 
 // EOF

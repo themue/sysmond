@@ -13,7 +13,7 @@ package poller_test
 
 import (
 	"context"
-	"fmt"
+	"strconv"
 	"sync"
 	"testing"
 	"time"
@@ -30,17 +30,22 @@ import (
 func TestPoller(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(3)
-	mpsync := collector.NewGenericMeterPoint("sync", func() (string, error) {
+	mpsync := collector.NewGenericMeterPoints("sync", func() (collector.Values, error) {
 		wg.Done()
-		return "done", nil
+		return collector.Values{"wait": "done"}, nil
 	})
+	testMetric := func(m *collector.Metrics, id, value string) {
+		if v, ok := m.Get(id); !ok || v != value {
+			t.Errorf("illegal meter point value %q: %q", id, v)
+		}
+	}
 	c := collector.New()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	mpa := NewMeterPoint("a")
-	mpb := NewMeterPoint("b")
-	mpc := NewMeterPoint("c")
-	mpd := NewMeterPoint("d")
+	mpa := NewMeterPoints("a")
+	mpb := NewMeterPoints("b")
+	mpc := NewMeterPoints("c")
+	mpd := NewMeterPoints("d")
 	err := c.Register(mpa, mpb, mpsync)
 	if err != nil {
 		t.Errorf("collector register error: %v", err)
@@ -59,14 +64,12 @@ func TestPoller(t *testing.T) {
 	if !ts.After(tsBegin) && !time.Now().After(ts) {
 		t.Errorf("illegal metrics timestamp")
 	}
-	if a, ok := m.Get("a"); !ok || a != "a = 3" {
-		t.Errorf("illegal meter point value a: %q", a)
-	}
-	if b, ok := m.Get("b"); !ok || b != "b = 3" {
-		t.Errorf("illegal meter point value b: %q", b)
-	}
-	if _, ok := m.Get("c"); ok {
-		t.Errorf("invalid meter point c")
+	testMetric(m, "a.i", "6")
+	testMetric(m, "a.j", "20")
+	testMetric(m, "b.i", "6")
+	testMetric(m, "b.j", "20")
+	if _, ok := m.Get("c.i"); ok {
+		t.Errorf("invalid meter points value for c.i")
 	}
 
 	// New collector.
@@ -86,29 +89,31 @@ func TestPoller(t *testing.T) {
 	if !ts.After(tsBegin) && !time.Now().After(ts) {
 		t.Errorf("illegal metrics timestamp")
 	}
-	if _, ok := m.Get("a"); ok {
-		t.Errorf("invalid meter point a")
+	if _, ok := m.Get("a.i"); ok {
+		t.Errorf("invalid meter points value for a.i")
 	}
-	if b, ok := m.Get("b"); !ok || b != "b = 8" {
-		t.Errorf("illegal meter point value b: %q", b)
-	}
-	if c, ok := m.Get("c"); !ok || c != "c = 5" {
-		t.Errorf("illegal meter point value c: %q", c)
-	}
-	if d, ok := m.Get("d"); !ok || d != "d = 5" {
-		t.Errorf("illegal meter point value d: %q", d)
-	}
+	testMetric(m, "b.i", "16")
+	testMetric(m, "b.j", "45")
+	testMetric(m, "c.i", "10")
+	testMetric(m, "c.j", "30")
+	testMetric(m, "d.i", "10")
+	testMetric(m, "d.j", "30")
 }
 
 //--------------------
 // HELPERS
 //--------------------
 
-func NewMeterPoint(id string) collector.MeterPoint {
+func NewMeterPoints(id string) collector.MeterPoints {
 	i := 0
-	return collector.NewGenericMeterPoint(id, func() (string, error) {
-		i++
-		return fmt.Sprintf("%s = %d", id, i), nil
+	j := 5
+	return collector.NewGenericMeterPoints(id, func() (collector.Values, error) {
+		i += 2
+		j += 5
+		return collector.Values{
+			"i": strconv.Itoa(i),
+			"j": strconv.Itoa(j),
+		}, nil
 	})
 }
 

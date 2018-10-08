@@ -1,4 +1,4 @@
-// System Monitor Daemon - Collector - Generic Meter Point - Unit Tests
+// System Monitor Daemon - Collector - Generic Meter Points - Unit Tests
 //
 // Copyright (C) 2018 Frank Mueller / Oldenburg / Germany
 //
@@ -23,39 +23,42 @@ import (
 // TESTS
 //--------------------
 
-// TestGenericOK tests a positive generic meter point retrieval.
+// TestGenericOK tests a positive generic meter points retrieval.
 func TestGenericOK(t *testing.T) {
-	gmp := collector.NewGenericMeterPoint("ok", func() (string, error) {
-		return "top", nil
+	gmp := collector.NewGenericMeterPoints("ok", func() (collector.Values, error) {
+		return collector.Values{
+			"first":  "top",
+			"second": "ok",
+		}, nil
 	})
 	if gmp.ID() != "ok" {
-		t.Errorf("invalid meter point ID: %q", gmp.ID())
+		t.Errorf("invalid meter points ID: %q", gmp.ID())
 	}
 	select {
-	case value := <-gmp.Retrieve():
-		if value != "top" {
-			t.Errorf("invalid meter point value: %q", value)
+	case values := <-gmp.Retrieve():
+		if values["first"] != "top" || values["second"] != "ok" {
+			t.Errorf("invalid meter points values: %q", values)
 		}
 	case <-time.After(5 * time.Second):
-		t.Errorf("meter point timeout")
+		t.Errorf("meter points retrieval timeout")
 	}
 }
 
 // TestGenericError tests a negative generic meter point retrieval.
 func TestGenericError(t *testing.T) {
-	gmp := collector.NewGenericMeterPoint("nok", func() (string, error) {
-		return "", errors.New("flop")
+	gmp := collector.NewGenericMeterPoints("nok", func() (collector.Values, error) {
+		return nil, errors.New("flop")
 	})
 	if gmp.ID() != "nok" {
-		t.Errorf("invalid meter point ID: %q", gmp.ID())
+		t.Errorf("invalid meter points ID: %q", gmp.ID())
 	}
 	select {
-	case value := <-gmp.Retrieve():
-		if value != "error: flop" {
-			t.Errorf("invalid meter point value: %q", value)
+	case values := <-gmp.Retrieve():
+		if len(values) != 1 || values["all"] != "error: flop" {
+			t.Errorf("invalid meter points values: %q", values)
 		}
 	case <-time.After(5 * time.Second):
-		t.Errorf("meter point timeout")
+		t.Errorf("meter points retrieval timeout")
 	}
 }
 

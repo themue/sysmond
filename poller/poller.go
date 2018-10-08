@@ -83,8 +83,8 @@ func (p *Poller) backend() {
 		select {
 		case <-p.ctx.Done():
 			return
-		case act := <-p.actionC:
-			act()
+		case action := <-p.actionC:
+			action()
 		case <-ticker.C:
 			p.timestamp = time.Now()
 			p.metrics = p.collector.Retrieve(p.ctx, p.interval)

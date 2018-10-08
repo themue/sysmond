@@ -1,4 +1,4 @@
-// System Monitor Daemon - Collector - Generic Meter Point
+// System Monitor Daemon - Collector - Generic Meter Points
 //
 // Copyright (C) 2018 Frank Mueller / Oldenburg / Germany
 //
@@ -19,37 +19,37 @@ import (
 // GENERIC METER POINT
 //--------------------
 
-// GenericMeterPoint takes a user defined function to retrieve any wanted value.
-type GenericMeterPoint struct {
+// GenericMeterPoints takes a user defined function to retrieve any wanted values.
+type GenericMeterPoints struct {
 	id       string
-	retrieve func() (string, error)
+	retrieve func() (Values, error)
 }
 
-// NewGenericMeterPoint creates a new meter point for generic functions.
-func NewGenericMeterPoint(id string, r func() (string, error)) *GenericMeterPoint {
-	return &GenericMeterPoint{
+// NewGenericMeterPoints creates new meter points for generic functions.
+func NewGenericMeterPoints(id string, r func() (Values, error)) *GenericMeterPoints {
+	return &GenericMeterPoints{
 		id:       id,
 		retrieve: r,
 	}
 }
 
-// ID implements MeterPoint.
-func (gmp *GenericMeterPoint) ID() string {
+// ID implements MeterPoints.
+func (gmp *GenericMeterPoints) ID() string {
 	return gmp.id
 }
 
-// Retrieve implements MeterPoint.
-func (gmp *GenericMeterPoint) Retrieve() <-chan string {
-	valueC := make(chan string, 1)
+// Retrieve implements MeterPoints.
+func (gmp *GenericMeterPoints) Retrieve() <-chan Values {
+	valuesC := make(chan Values, 1)
 	go func() {
-		value, err := gmp.retrieve()
+		values, err := gmp.retrieve()
 		if err != nil {
-			valueC <- fmt.Sprintf("error: %v", err)
+			valuesC <- Values{"all": fmt.Sprintf("error: %v", err)}
 			return
 		}
-		valueC <- value
+		valuesC <- values
 	}()
-	return valueC
+	return valuesC
 }
 
 // EOF

@@ -21,19 +21,27 @@ import (
 )
 
 //--------------------
+// VALUE
+//--------------------
+
+// Values contains a set of meter point variables and their values.
+type Values map[string]string
+
+//--------------------
 // METER POINT
 //--------------------
 
-// MeterPoint defines the interface for individual meter point implementations
+// MeterPoints defines the interface for individual meter points implementations
 // and instances. It is used by the collector to retrieve the according values
 // in intervals.
-type MeterPoint interface {
-	// ID returns the identificator of of the individual meter point.
+type MeterPoints interface {
+	// ID returns the identificator of of the individual meter points. It
+	// defines also the stem for the returned values.
 	ID() string
 
-	// Retrieve returns a channel delivering the polled value. Internal errors
-	// have to be returned as string formatted "error: xxx".
-	Retrieve() <-chan string
+	// Retrieve returns a channel delivering the polled values. Internal errors
+	// have to be returned as string value formatted "error: xxx".
+	Retrieve() <-chan Values
 }
 
 //--------------------
@@ -43,13 +51,13 @@ type MeterPoint interface {
 // Metrics contains the collected values for marshalling.
 type Metrics struct {
 	mu     sync.RWMutex
-	values map[string]string
+	values Values
 }
 
 // NewMetrics creates empty metrics prepared to take the passed number of values.
 func NewMetrics(size int) *Metrics {
 	return &Metrics{
-		values: make(map[string]string, size),
+		values: make(Values, size),
 	}
 }
 
@@ -58,6 +66,16 @@ func (m *Metrics) Set(id, value string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.values[id] = value
+}
+
+// Add sets a number of values with a common stem.
+func (m *Metrics) Add(stem string, values Values) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for id, value := range values {
+		fullID := fmt.Sprintf("%s.%s", stem, id)
+		m.values[fullID] = value
+	}
 }
 
 // Get reads one value from the metrics.
@@ -83,19 +101,19 @@ func (m *Metrics) Marshal() ([]byte, error) {
 // on demand.
 type Collector struct {
 	mu          sync.Mutex
-	meterPoints map[string]MeterPoint
+	meterPoints map[string]MeterPoints
 }
 
 // New creates a new collector instance.
 func New() *Collector {
 	return &Collector{
-		meterPoints: make(map[string]MeterPoint),
+		meterPoints: make(map[string]MeterPoints),
 	}
 }
 
 // Register adds meter points to the collector. In case of double IDs those
 // will be skipped and an error returned.
-func (c *Collector) Register(mps ...MeterPoint) error {
+func (c *Collector) Register(mps ...MeterPoints) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	var dupes []string
@@ -125,13 +143,13 @@ func (c *Collector) Retrieve(ctx context.Context, timeout time.Duration) *Metric
 	var wg sync.WaitGroup
 	for id, mp := range c.meterPoints {
 		wg.Add(1)
-		go func(fid string, fmp MeterPoint) {
+		go func(fid string, fmp MeterPoints) {
 			defer wg.Done()
 			select {
 			case <-ctx.Done():
 				metrics.Set(fid, "error: cancelled")
-			case value := <-fmp.Retrieve():
-				metrics.Set(fid, value)
+			case values := <-fmp.Retrieve():
+				metrics.Add(fid, values)
 			case <-time.After(timeout):
 				metrics.Set(fid, "error: timeout")
 			}

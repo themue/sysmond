@@ -28,23 +28,23 @@ import (
 func TestCollectorOK(t *testing.T) {
 	c := collector.New()
 	ctx := context.Background()
-	mpa := NewStubMeterPoint("a", 0, 100*time.Millisecond)
-	mpb := NewStubMeterPoint("b", 5, 200*time.Millisecond)
-	mpc := NewStubMeterPoint("c", 10, 50*time.Millisecond)
+	mpa := NewStubMeterPoints("a", 0, 100*time.Millisecond)
+	mpb := NewStubMeterPoints("b", 5, 200*time.Millisecond)
+	mpc := NewStubMeterPoints("c", 10, 50*time.Millisecond)
 	err := c.Register(mpa, mpb, mpc)
 	if err != nil {
 		t.Errorf("collector register error: %v", err)
 	}
 	metrics := c.Retrieve(ctx, time.Second)
-	if a, ok := metrics.Get("a"); !ok || a != "1" {
+	if a, ok := metrics.Get("a.count"); !ok || a != "1" {
 		t.Errorf("illegal value a: %q", a)
 	}
 	metrics = c.Retrieve(ctx, time.Second)
-	if b, ok := metrics.Get("b"); !ok || b != "7" {
+	if b, ok := metrics.Get("b.count"); !ok || b != "7" {
 		t.Errorf("illegal value b: %q", b)
 	}
 	metrics = c.Retrieve(ctx, time.Second)
-	if c, ok := metrics.Get("c"); !ok || c != "13" {
+	if c, ok := metrics.Get("c.count"); !ok || c != "13" {
 		t.Errorf("illegal value c: %q", c)
 	}
 }
@@ -52,9 +52,9 @@ func TestCollectorOK(t *testing.T) {
 // TestCollectorError tests registering meter points with duplicate ID.
 func TestCollectorError(t *testing.T) {
 	c := collector.New()
-	mpa := NewStubMeterPoint("a", 0, 100*time.Millisecond)
-	mpb := NewStubMeterPoint("b", 5, 200*time.Millisecond)
-	mpc := NewStubMeterPoint("b", 10, 50*time.Millisecond) // <- Double ID.
+	mpa := NewStubMeterPoints("a", 0, 100*time.Millisecond)
+	mpb := NewStubMeterPoints("b", 5, 200*time.Millisecond)
+	mpc := NewStubMeterPoints("b", 10, 50*time.Millisecond) // <- Double ID.
 	err := c.Register(mpa, mpb, mpc)
 	if err == nil {
 		t.Errorf("expected registration error")
@@ -69,9 +69,9 @@ func TestCollectorCancel(t *testing.T) {
 	c := collector.New()
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	mpa := NewStubMeterPoint("a", 0, 2*time.Second)
-	mpb := NewStubMeterPoint("b", 5, 2*time.Second)
-	mpc := NewStubMeterPoint("c", 10, 2*time.Second)
+	mpa := NewStubMeterPoints("a", 0, 2*time.Second)
+	mpb := NewStubMeterPoints("b", 5, 2*time.Second)
+	mpc := NewStubMeterPoints("c", 10, 2*time.Second)
 	err := c.Register(mpa, mpb, mpc)
 	if err != nil {
 		t.Errorf("collector register error: %v", err)
@@ -92,16 +92,16 @@ func TestCollectorCancel(t *testing.T) {
 // STUBS
 //--------------------
 
-// StubMeterPoint simulates a meter point.
-type StubMeterPoint struct {
+// StubMeterPoints simulates meter points.
+type StubMeterPoints struct {
 	id    string
 	count int
 	delay time.Duration
 }
 
-// NewStubMeterPoint creates a new stub for tests.
-func NewStubMeterPoint(id string, start int, delay time.Duration) *StubMeterPoint {
-	smp := &StubMeterPoint{
+// NewStubMeterPoints creates a new stub for tests.
+func NewStubMeterPoints(id string, start int, delay time.Duration) *StubMeterPoints {
+	smp := &StubMeterPoints{
 		id:    id,
 		count: start,
 		delay: delay,
@@ -109,20 +109,20 @@ func NewStubMeterPoint(id string, start int, delay time.Duration) *StubMeterPoin
 	return smp
 }
 
-// ID implements MeterPoint.
-func (smp *StubMeterPoint) ID() string {
+// ID implements MeterPoints.
+func (smp *StubMeterPoints) ID() string {
 	return smp.id
 }
 
-// Retrieve implements MeterPoint.
-func (smp *StubMeterPoint) Retrieve() <-chan string {
-	countC := make(chan string, 1)
+// Retrieve implements MeterPoints.
+func (smp *StubMeterPoints) Retrieve() <-chan collector.Values {
+	valuesC := make(chan collector.Values, 1)
 	go func() {
 		time.Sleep(smp.delay)
 		smp.count++
-		countC <- strconv.Itoa(smp.count)
+		valuesC <- collector.Values{"count": strconv.Itoa(smp.count)}
 	}()
-	return countC
+	return valuesC
 }
 
 // EOF

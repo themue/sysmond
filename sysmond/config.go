@@ -33,12 +33,12 @@ type Configuration struct {
 func ReadConfiguration() (*Configuration, error) {
 	// Configure collector and meter points.
 	c := collector.New()
-	totalMemMP := collector.NewMemoryMeterPoint(collector.MemTotal)
-	freeMemMP := collector.NewMemoryMeterPoint(collector.MemFree)
-	availableMemMP := collector.NewMemoryMeterPoint(collector.MemAvailable)
-	usedDiskMP := collector.NewDiskMeterPoint("root", "/", collector.DiskUsed)
-	availableDiskMP := collector.NewDiskMeterPoint("root", "/", collector.DiskAvailable)
-	c.Register(totalMemMP, freeMemMP, availableMemMP, usedDiskMP, availableDiskMP)
+	memMP := collector.NewMemoryMeterPoints()
+	rootDiskMP := collector.NewDiskMeterPoints("root", "/")
+	versionMP := collector.NewGenericMeterPoints("version", func() (collector.Values, error) {
+		return collector.Values{"sysmond": version}, nil
+	})
+	c.Register(memMP, rootDiskMP, versionMP)
 	// Return simulated configuration.
 	return &Configuration{
 		Address:   ":1984",

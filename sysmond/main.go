@@ -21,6 +21,12 @@ import (
 )
 
 //--------------------
+// CONSTANTS
+//--------------------
+
+const version = "v0.1.0"
+
+//--------------------
 // RUN
 //--------------------
 
@@ -43,7 +49,7 @@ func Run(ctx context.Context, cfg *Configuration) <-chan error {
 
 // main runs the system monitor daemon.
 func main() {
-	log.Printf("system monitor daemon ...")
+	log.Printf("system monitor daemon %s ...", version)
 
 	// Create a context with timeout to automatically end the demo program.
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
