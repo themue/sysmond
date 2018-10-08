@@ -29,7 +29,7 @@ type Poller struct {
 	ctx       context.Context
 	collector *collector.Collector
 	interval  time.Duration
-	actorC    chan func()
+	actionC   chan func()
 	timestamp time.Time
 	metrics   *collector.Metrics
 }
@@ -40,7 +40,7 @@ func New(ctx context.Context, c *collector.Collector, i time.Duration) *Poller {
 		ctx:       ctx,
 		collector: c,
 		interval:  i,
-		actorC:    make(chan func()),
+		actionC:   make(chan func()),
 		timestamp: time.Now(),
 	}
 	go p.backend()
@@ -50,23 +50,29 @@ func New(ctx context.Context, c *collector.Collector, i time.Duration) *Poller {
 // SetCollector exchanges the collector. It's not needed, but demonstrates the
 // serialised setting of a poller field.
 func (p *Poller) SetCollector(c *collector.Collector) {
-	p.actorC <- func() {
+	p.do(func() {
 		p.collector = c
-	}
+	})
 }
 
-// Metrics retrieves the latest metrics and the according timestamp. Wait channel
-// is needed to avoid race conditions, could be done in a small actor package like
-// in https://github.com/tideland/gotogether.
+// Metrics retrieves the latest metrics and the according timestamp.
 func (p *Poller) Metrics() (ts time.Time, m *collector.Metrics) {
-	waitC := make(chan struct{})
-	p.actorC <- func() {
+	p.do(func() {
 		ts = p.timestamp
 		m = p.metrics
+	})
+	return
+}
+
+// do lets the actor perform an action in the backend. The wait channel ensures that
+// it is performed to avoid race conditions.
+func (p *Poller) do(action func()) {
+	waitC := make(chan struct{})
+	p.actionC <- func() {
+		action()
 		close(waitC)
 	}
 	<-waitC
-	return
 }
 
 // backend runs the poller goroutine and calls the collector in intervals.
@@ -77,7 +83,7 @@ func (p *Poller) backend() {
 		select {
 		case <-p.ctx.Done():
 			return
-		case act := <-p.actorC:
+		case act := <-p.actionC:
 			act()
 		case <-ticker.C:
 			p.timestamp = time.Now()
