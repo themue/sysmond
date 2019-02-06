@@ -41,14 +41,14 @@ func TestCPUOK(t *testing.T) {
 	}
 	select {
 	case values := <-cmp.Retrieve():
-		if len(values) % 3 != 0 {
+		if len(values)%3 != 0 {
 			t.Errorf("invalid number of values: %d", len(values))
 		}
 		cores := len(values) / 3
 		for i := 0; i < cores; i++ {
-		testValue(values, i, "user")
-		testValue(values, i, "system")
-		testValue(values, i, "idle")
+			testValue(values, i, "user")
+			testValue(values, i, "system")
+			testValue(values, i, "idle")
 		}
 	case <-time.After(5 * time.Second):
 		t.Errorf("meter points retrieve timeout")
